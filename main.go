@@ -51,20 +51,26 @@ func (c *client) getMergeEventForPR(ctx context.Context, issue *github.Issue) (*
 	return nil, fmt.Errorf("merge event not found")
 }
 
-func (c *client) getCommitMessageFromMerge(ctx context.Context, ie *github.IssueEvent) (string, error) {
+func (c *client) getCommitFromMerge(ctx context.Context, ie *github.IssueEvent) (*github.Commit, error) {
 	if ie.GetEvent() != "merged" {
-		return "", fmt.Errorf("not merge issue event")
+		return nil, fmt.Errorf("not merge issue event")
 	}
 	cmt, _, err := c.c.Repositories.GetCommit(ctx, owner, repo, ie.GetCommitID())
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return cmt.Commit.GetMessage(), err
+	return cmt.Commit, err
 }
 
-func (c *client) generateNotes(issues []*github.Issue) (notes []string) {
+type mergedPR struct {
+	issue  *github.Issue
+	commit *github.Commit
+}
+
+func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 	ctx := context.Background()
 	for _, ii := range issues {
+		fmt.Println(ii.Labels)
 		fmt.Println(issueToString(ii))
 		if ii.PullRequestLinks == nil {
 			fmt.Println("not a pull request")
@@ -76,19 +82,28 @@ func (c *client) generateNotes(issues []*github.Issue) (notes []string) {
 			continue
 		}
 		fmt.Println(issueEventToString(ie))
-		m, err := c.getCommitMessageFromMerge(ctx, ie)
+		c, err := c.getCommitFromMerge(ctx, ie)
 		if err != nil {
 			fmt.Println("failed to get commit message: ", err)
+			continue
 		}
-		// fmt.Println(m) // TODO: write a file.
-		n := getFirstLine(m)
+		prs = append(prs, &mergedPR{issue: ii, commit: c})
+	}
+	return
+}
+
+func (c *client) generateNotes(issues []*github.Issue) (notes []string) {
+	prs := c.getMergedPRs(issues)
+	for _, pr := range prs {
+		ii := pr.issue
+		c := pr.commit
+		n := getFirstLine(c.GetMessage())
 		if ok := noteRegexp.MatchString(n); !ok {
 			fmt.Println("   ++++ doesn't match noteRegexp, ", n)
 			n = fmt.Sprintf("%v (#%d)", ii.GetTitle(), ii.GetNumber())
 		}
 		fmt.Println(n)
 		notes = append(notes, n)
-		fmt.Println()
 	}
 	return
 }
@@ -122,7 +137,7 @@ func main() {
 		return
 	}
 	notes := c.generateNotes(issues)
-	fmt.Print(" ================ generated notes ================\n\n")
+	fmt.Print("\n================ generated notes ================\n\n")
 	for _, n := range notes {
 		fmt.Println(n)
 	}
