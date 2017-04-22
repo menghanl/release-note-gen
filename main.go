@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -30,15 +31,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const (
-	owner = "grpc"
-	repo  = "grpc-go"
-)
-
 var (
-	noteRegexp = regexp.MustCompile(`^.*\(#[0-9]{4}\)$`)
+	noteRegexp = regexp.MustCompile(`^.*\(#[0-9]+\)$`)
 	token      = flag.String("token", "", "github token")
-	release    = flag.String("release", "1.3", "release number")
+	release    = flag.String("release", "", "release number")
+	owner      = flag.String("owner", "grpc", "github repo owner")
+	repo       = flag.String("repo", "grpc-go", "github repo")
 )
 
 ///////////////////// string utils ////////////////////////
@@ -65,7 +63,7 @@ type client struct {
 }
 
 func (c *client) getClosedIssuesWithLabel(ctx context.Context, label string) ([]*github.Issue, error) {
-	issues, _, err := c.c.Issues.ListByRepo(ctx, owner, repo,
+	issues, _, err := c.c.Issues.ListByRepo(ctx, *owner, *repo,
 		&github.IssueListByRepoOptions{
 			State:  "closed",
 			Labels: []string{label},
@@ -78,7 +76,7 @@ func (c *client) getClosedIssuesWithLabel(ctx context.Context, label string) ([]
 }
 
 func (c *client) getMergeEventForPR(ctx context.Context, issue *github.Issue) (*github.IssueEvent, error) {
-	events, _, err := c.c.Issues.ListIssueEvents(ctx, owner, repo, issue.GetNumber(), nil)
+	events, _, err := c.c.Issues.ListIssueEvents(ctx, *owner, *repo, issue.GetNumber(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +92,7 @@ func (c *client) getCommitFromMerge(ctx context.Context, ie *github.IssueEvent) 
 	if ie.GetEvent() != "merged" {
 		return nil, fmt.Errorf("not merge issue event")
 	}
-	cmt, _, err := c.c.Repositories.GetCommit(ctx, owner, repo, ie.GetCommitID())
+	cmt, _, err := c.c.Repositories.GetCommit(ctx, *owner, *repo, ie.GetCommitID())
 	if err != nil {
 		return nil, err
 	}
@@ -199,11 +197,21 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 
 func main() {
 	flag.Parse()
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: *token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
+
+	if *release == "" {
+		fmt.Println("invalid release number, usage:")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	var tc *http.Client
+	if *token != "" {
+		ctx := context.Background()
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: *token},
+		)
+		tc = oauth2.NewClient(ctx, ts)
+	}
 
 	prs := getMergedPRsForLabel(tc, *release)
 	notes := generateNotes(prs)
