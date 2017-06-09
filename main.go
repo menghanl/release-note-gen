@@ -63,15 +63,18 @@ type client struct {
 }
 
 func (c *client) getClosedIssuesWithLabel(ctx context.Context, label string) ([]*github.Issue, error) {
+	fmt.Println(label)
 	issues, _, err := c.c.Issues.ListByRepo(ctx, *owner, *repo,
 		&github.IssueListByRepoOptions{
-			State:  "closed",
-			Labels: []string{label},
+			State:       "closed",
+			Labels:      []string{label},
+			ListOptions: github.ListOptions{PerPage: 1000},
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("count issues", len(issues))
 	return issues, nil
 }
 
@@ -147,11 +150,12 @@ func getMergedPRsForLabel(httpClient *http.Client, label string) (prs []*mergedP
 
 var sortWeight = map[string]int{
 	"API change":      60,
-	"New Feature":     50,
+	"New features":    50,
 	"Behavior change": 40,
-	"Bug fix":         30,
-	"Performance":     20,
+	"Performance":     30,
+	"Bug fixes":       20,
 	"Documentation":   10,
+	"Testing":         0,
 }
 
 func sortLabelName(labels []string) []string {
@@ -168,7 +172,7 @@ func pickMostWeightedLabel(labels []github.Label) string {
 	}
 	sortLabelName(names)
 	if sortWeight[names[0]] == 0 {
-		return "Bug fix" // Default to bug fix
+		return "Bug fixes" // Default to bug fixes
 	}
 	return names[0]
 }
@@ -182,6 +186,7 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 	notes = make(map[string][]string)
 	for _, pr := range prs {
 		label := pickMostWeightedLabel(pr.issue.Labels)
+		fmt.Printf(" - label picked: %v, from: %v\n", label, pr.issue.Labels)
 		n := getFirstLine(pr.commit.GetMessage())
 		if ok := noteRegexp.MatchString(n); !ok {
 			fmt.Println("   ++++ doesn't match noteRegexp, ", n)
