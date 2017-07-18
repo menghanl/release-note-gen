@@ -171,7 +171,7 @@ func pickMostWeightedLabel(labels []github.Label) string {
 		names = append(names, l.GetName())
 	}
 	sortLabelName(names)
-	if sortWeight[names[0]] == 0 {
+	if _, ok := sortWeight[names[0]]; !ok {
 		return "Bug fixes" // Default to bug fixes
 	}
 	return names[0]
