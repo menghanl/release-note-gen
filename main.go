@@ -148,6 +148,8 @@ func getMergedPRsForLabel(httpClient *http.Client, label string) (prs []*mergedP
 
 ///////////////////// pick most weighted label ////////////////////////
 
+const labelPrefix = "Type: "
+
 var sortWeight = map[string]int{
 	"API change":      60,
 	"New features":    50,
@@ -168,7 +170,7 @@ func sortLabelName(labels []string) []string {
 func pickMostWeightedLabel(labels []github.Label) string {
 	var names []string
 	for _, l := range labels {
-		names = append(names, l.GetName())
+		names = append(names, strings.TrimPrefix(l.GetName(), labelPrefix))
 	}
 	sortLabelName(names)
 	if _, ok := sortWeight[names[0]]; !ok {
