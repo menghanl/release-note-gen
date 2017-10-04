@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 )
@@ -43,7 +44,19 @@ var (
 ///////////////////// string utils ////////////////////////
 
 func issueToString(ii *github.Issue) string {
-	return fmt.Sprintf("%v [%v] - %v\n%v", ii.GetNumber(), ii.GetState(), ii.GetTitle(), ii.GetHTMLURL())
+	var ret string
+	ret += color.CyanString("%v [%v] - %v", ii.GetNumber(), ii.GetState(), ii.GetTitle())
+	ret += "\n - "
+	ret += color.BlueString("%v", ii.GetHTMLURL())
+	return ret
+}
+
+func labelsToString(ls []github.Label) string {
+	var names []string
+	for _, l := range ls {
+		names = append(names, l.GetName())
+	}
+	return fmt.Sprintf("%v", names)
 }
 
 func issueEventToString(ie *github.IssueEvent) string {
@@ -131,8 +144,8 @@ type mergedPR struct {
 func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 	ctx := context.Background()
 	for _, ii := range issues {
-		fmt.Println(ii.Labels)
 		fmt.Println(issueToString(ii))
+		fmt.Println(" -", labelsToString(ii.Labels))
 		if ii.PullRequestLinks == nil {
 			fmt.Println("not a pull request")
 			continue
@@ -143,7 +156,7 @@ func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 			fmt.Println("failed to get merge event: ", err)
 			continue
 		}
-		fmt.Println(issueEventToString(ie))
+		fmt.Println(" -", issueEventToString(ie))
 		c, err := c.getCommitFromMerge(ctx, ie)
 		if err != nil {
 			fmt.Println("failed to get commit message: ", err)
@@ -221,13 +234,14 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 	notes = make(map[string][]string)
 	for _, pr := range prs {
 		label := pickMostWeightedLabel(pr.issue.Labels)
-		fmt.Printf(" - label picked: %v, from: %v\n", label, pr.issue.Labels)
+		fmt.Printf(" [%v] - ", color.BlueString("%v", pr.issue.GetNumber()))
+		fmt.Print(color.GreenString("%-18q", label))
+		fmt.Printf(" from: %v\n", labelsToString(pr.issue.Labels))
 		n := getFirstLine(pr.commit.GetMessage())
 		if ok := noteRegexp.MatchString(n); !ok {
-			fmt.Println("   ++++ doesn't match noteRegexp, ", n)
+			color.Red("   ++++ doesn't match noteRegexp, ", n)
 			n = fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber())
 		}
-		fmt.Println(n)
 		notes[label] = append(notes[label], n)
 	}
 	return
