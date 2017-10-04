@@ -178,14 +178,15 @@ const (
 )
 
 var sortWeight = map[string]int{
-	"Dependencies":    70,
-	"API Change":      60,
-	"Feature":         50,
-	"Behavior Change": 40,
-	"Performance":     30,
-	"Bug":             20,
-	"Documentation":   10,
-	"Testing":         0,
+	"Dependencies":     70,
+	"API Change":       60,
+	"Feature":          50,
+	"Behavior Change":  40,
+	"Performance":      30,
+	"Bug":              20,
+	"Internal Cleanup": 15,
+	"Documentation":    10,
+	"Testing":          0,
 }
 
 func sortLabelName(labels []string) []string {
