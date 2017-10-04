@@ -25,6 +25,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-github/github"
@@ -62,12 +63,32 @@ type client struct {
 	c *github.Client
 }
 
-func (c *client) getClosedIssuesWithLabel(ctx context.Context, label string) ([]*github.Issue, error) {
-	fmt.Println(label)
+func (c *client) getMilestoneNumberForTitle(ctx context.Context, milestoneTitle string) (int, error) {
+	fmt.Println("milestone title: ", milestoneTitle)
+	milestones, _, err := c.c.Issues.ListMilestones(context.Background(), *owner, *repo,
+		&github.MilestoneListOptions{
+			State:       "all",
+			ListOptions: github.ListOptions{PerPage: 100},
+		},
+	)
+	if err != nil {
+		return 0, err
+	}
+	fmt.Println("count milestones", len(milestones))
+	for _, m := range milestones {
+		if m.GetTitle() == milestoneTitle {
+			return m.GetNumber(), nil
+		}
+	}
+	return 0, fmt.Errorf("no milestone with title %q was found", milestoneTitle)
+}
+
+func (c *client) getClosedIssuesWithMilestoneNumber(ctx context.Context, milestoneNumber string) ([]*github.Issue, error) {
+	fmt.Println("milestone number: ", milestoneNumber)
 	issues, _, err := c.c.Issues.ListByRepo(ctx, *owner, *repo,
 		&github.IssueListByRepoOptions{
 			State:       "closed",
-			Labels:      []string{label},
+			Milestone:   milestoneNumber,
 			ListOptions: github.ListOptions{PerPage: 1000},
 		},
 	)
@@ -133,22 +154,28 @@ func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 	return
 }
 
-func getMergedPRsForLabel(httpClient *http.Client, label string) (prs []*mergedPR) {
+func getMergedPRsForMilestone(httpClient *http.Client, milestoneTitle string) (prs []*mergedPR) {
 	c := &client{c: github.NewClient(httpClient)}
-	issues, err := c.getClosedIssuesWithLabel(context.Background(), label)
+	num, err := c.getMilestoneNumberForTitle(context.Background(), milestoneTitle)
+	if err != nil {
+		fmt.Println("failed to get milestone number: ", err)
+	}
+	issues, err := c.getClosedIssuesWithMilestoneNumber(context.Background(), strconv.Itoa(num))
 	if err != nil {
 		fmt.Println("failed to get issues: ", err)
 		return
 	}
-	prs = c.getMergedPRs(issues)
-	return
+	return c.getMergedPRs(issues)
 }
 
 ////////////////////////////////////////////////////
 
 ///////////////////// pick most weighted label ////////////////////////
 
-const labelPrefix = "Type: "
+const (
+	labelPrefix  = "Type: "
+	defaultLabel = "Bug"
+)
 
 var sortWeight = map[string]int{
 	"Dependencies":    70,
@@ -169,13 +196,17 @@ func sortLabelName(labels []string) []string {
 }
 
 func pickMostWeightedLabel(labels []github.Label) string {
+	if len(labels) <= 0 {
+		fmt.Println("0 lable was assigned to issue")
+		return defaultLabel
+	}
 	var names []string
 	for _, l := range labels {
 		names = append(names, strings.TrimPrefix(l.GetName(), labelPrefix))
 	}
 	sortLabelName(names)
 	if _, ok := sortWeight[names[0]]; !ok {
-		return "Bug" // Default to bug.
+		return defaultLabel
 	}
 	return names[0]
 }
@@ -203,6 +234,8 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 
 ////////////////////////////////////////////////////
 
+const milestoneTitleSurfix = " Release" // For example, "1.7 Release".
+
 func main() {
 	flag.Parse()
 
@@ -221,7 +254,7 @@ func main() {
 		tc = oauth2.NewClient(ctx, ts)
 	}
 
-	prs := getMergedPRsForLabel(tc, *release)
+	prs := getMergedPRsForMilestone(tc, *release+milestoneTitleSurfix)
 	notes := generateNotes(prs)
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 
