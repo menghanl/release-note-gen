@@ -1,7 +1,8 @@
 # release-note-gen
 
-`release-note-gen` generates release notes for a release from closed github PRs.
-It uses all closed PRs labelled as part of the release to generate the note.
+`release-note-gen` generates release notes for a release from closed github PRs
+within the corresponding release milestone. For example, PRs that should be
+included in release note for 1.7.0 are all set to milestone "1.7 Release".
 
 For each closed PR, it generates one line release note in for form of:
 ```
@@ -12,9 +13,11 @@ For example:
 Add grpc.Version string and use it in the UA (#1144)
 ```
  
-It uses the PR labels other than release number as the category of the change.
+The PR's "Type" labels are used as the category of the change.
+For example, a PR with label `["Type: API change"]` will be classified as `"API change"`.
 
-- If a PR has label `["1.3", "API change"]`, it will be classified as `"API change"`.
 - If a PR has more than one labels, the labels will be sorted in the order of
- `"API change", "New Feature", "Behavior change", "Bug fix", "Performance", "Documentation"`
-- If a PR has only the release number label, it will be classified as `"Bug fix"`.
+ `"Dependencies", "API Change", "Feature", "Behavior Change", "Performance", "Bug", "Internal Cleanup", "Documentation", "Testing"`,
+ and the first one will be picked as the final category.
+- If a PR has no "Type" label (which shouldn't happen), it will be classified as
+  `"Bug"`.
