@@ -196,13 +196,13 @@ const (
 var sortWeight = map[string]int{
 	"Dependencies":     70,
 	"API Change":       60,
-	"Feature":          50,
-	"Behavior Change":  40,
+	"Behavior Change":  50,
+	"Feature":          40,
 	"Performance":      30,
 	"Bug":              20,
-	"Internal Cleanup": 15,
 	"Documentation":    10,
 	"Testing":          0,
+	"Internal Cleanup": 0,
 }
 
 func sortLabelName(labels []string) []string {
@@ -237,6 +237,10 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 	notes = make(map[string][]string)
 	for _, pr := range prs {
 		label := pickMostWeightedLabel(pr.issue.Labels)
+		_, ok := labelToSectionName[label]
+		if !ok {
+			continue // If ok==false, ignore this PR in the release note.
+		}
 		fmt.Printf(" [%v] - ", color.BlueString("%v", pr.issue.GetNumber()))
 		fmt.Print(color.GreenString("%-18q", label))
 		fmt.Printf(" from: %v\n", labelsToString(pr.issue.Labels))
@@ -253,6 +257,15 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 ////////////////////////////////////////////////////
 
 const milestoneTitleSurfix = " Release" // For example, "1.7 Release".
+var labelToSectionName = map[string]string{
+	"Dependencies":    "Dependencies",
+	"API Change":      "API Changes",
+	"Behavior Change": "Behavior Changes",
+	"Feature":         "New Features",
+	"Performance":     "Performance Improvements",
+	"Bug":             "Bug Fixes",
+	"Documentation":   "Documentation",
+}
 
 func main() {
 	flag.Parse()
@@ -282,7 +295,7 @@ func main() {
 	}
 	sortLabelName(keys)
 	for _, k := range keys {
-		fmt.Println("#", k)
+		fmt.Println("#", labelToSectionName[k])
 		for _, n := range notes[k] {
 			fmt.Println(" *", n)
 		}
