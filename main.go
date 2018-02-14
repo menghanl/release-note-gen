@@ -295,6 +295,7 @@ func main() {
 	}
 	sortLabelName(keys)
 	for _, k := range keys {
+		fmt.Println()
 		fmt.Println("#", labelToSectionName[k])
 		for _, n := range notes[k] {
 			fmt.Println(" *", n)
