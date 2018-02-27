@@ -172,8 +172,7 @@ func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 	return
 }
 
-func getMergedPRsForMilestone(httpClient *http.Client, milestoneTitle string) (prs []*mergedPR) {
-	c := &client{c: github.NewClient(httpClient)}
+func getMergedPRsForMilestone(c *client, milestoneTitle string) (prs []*mergedPR) {
 	num, err := c.getMilestoneNumberForTitle(context.Background(), milestoneTitle)
 	if err != nil {
 		fmt.Println("failed to get milestone number: ", err)
@@ -286,8 +285,9 @@ func main() {
 		)
 		tc = oauth2.NewClient(ctx, ts)
 	}
+	c := &client{c: github.NewClient(tc)}
 
-	prs := getMergedPRsForMilestone(tc, *release+milestoneTitleSurfix)
+	prs := getMergedPRsForMilestone(c, *release+milestoneTitleSurfix)
 	notes := generateNotes(prs)
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 
