@@ -51,6 +51,8 @@ func issueToString(ii *github.Issue) string {
 	ret += color.CyanString("%v [%v] - %v", ii.GetNumber(), ii.GetState(), ii.GetTitle())
 	ret += "\n - "
 	ret += color.BlueString("%v", ii.GetHTMLURL())
+	ret += "\n - "
+	ret += color.BlueString("author: %v", *ii.GetUser().Login)
 	return ret
 }
 
