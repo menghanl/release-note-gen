@@ -43,6 +43,8 @@ var (
 	release    = flag.String("release", "", "release number")
 	owner      = flag.String("owner", "grpc", "github repo owner")
 	repo       = flag.String("repo", "grpc-go", "github repo")
+	thanks     = flag.Bool("thanks", false, "whether to include thank you note. grpc organization members are excluded")
+	urwelcome  = flag.String("urwelcome", "", "list of users to exclude from thank you note, format: user1,user2")
 )
 
 ///////////////////// string utils ////////////////////////
@@ -213,9 +215,8 @@ func (c *client) getOrgMembers(org string) map[string]struct{} {
 ///////////////////// pick most weighted label ////////////////////////
 
 const (
-	labelPrefix   = "Type: "
-	defaultLabel  = "Bug"
-	thankYouLabel = "Thank You"
+	labelPrefix  = "Type: "
+	defaultLabel = "Bug"
 )
 
 var sortWeight = map[string]int{
@@ -228,7 +229,6 @@ var sortWeight = map[string]int{
 	"Documentation":    10,
 	"Testing":          0,
 	"Internal Cleanup": 0,
-	thankYouLabel:      -1, // Thank you label goes last.
 }
 
 func sortLabelName(labels []string) []string {
@@ -263,15 +263,17 @@ type note struct {
 	sub  []string
 }
 
-func (n *note) String() string {
+func (n *note) toMarkdown(includeSub bool) string {
 	ret := " * " + n.head
-	for _, s := range n.sub {
-		ret += "\n   - " + s
+	if includeSub {
+		for _, s := range n.sub {
+			ret += "\n   - " + s
+		}
 	}
 	return ret
 }
 
-func generateNotes(prs []*mergedPR, grpcMembers map[string]struct{}) (notes map[string][]*note) {
+func generateNotes(prs []*mergedPR, grpcMembers, urwelcomeMap map[string]struct{}) (notes map[string][]*note) {
 	fmt.Print("\n================ generating notes ================\n\n")
 	notes = make(map[string][]*note)
 	for _, pr := range prs {
@@ -295,7 +297,9 @@ func generateNotes(prs []*mergedPR, grpcMembers map[string]struct{}) (notes map[
 
 		user := pr.issue.GetUser().GetLogin()
 		if _, ok := grpcMembers[user]; !ok {
-			noteLine.sub = append(noteLine.sub, "Special thanks: "+"@"+user)
+			if _, ok := urwelcomeMap[user]; !ok {
+				noteLine.sub = append(noteLine.sub, "Special thanks: "+"@"+user)
+			}
 		}
 
 		notes[label] = append(notes[label], noteLine)
@@ -314,7 +318,6 @@ var labelToSectionName = map[string]string{
 	"Performance":     "Performance Improvements",
 	"Bug":             "Bug Fixes",
 	"Documentation":   "Documentation",
-	"Thank You":       "Thank You",
 }
 
 func main() {
@@ -336,8 +339,16 @@ func main() {
 	}
 	c := &client{c: github.NewClient(tc)}
 
+	urwelcomeMap := make(map[string]struct{})
+	if *thanks {
+		tmp := strings.Split(*urwelcome, ",")
+		for _, t := range tmp {
+			urwelcomeMap[t] = struct{}{}
+		}
+	}
+
 	prs := c.getMergedPRsForMilestone(*release + milestoneTitleSurfix)
-	notes := generateNotes(prs, c.getOrgMembers("grpc"))
+	notes := generateNotes(prs, c.getOrgMembers("grpc"), urwelcomeMap)
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 
 	var keys []string
@@ -349,7 +360,7 @@ func main() {
 		fmt.Println()
 		fmt.Println("#", labelToSectionName[k])
 		for _, n := range notes[k] {
-			fmt.Println(n)
+			fmt.Println(n.toMarkdown(*thanks))
 		}
 	}
 }
