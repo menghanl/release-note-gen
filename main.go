@@ -275,12 +275,12 @@ func generateNotes(prs []*mergedPR, grpcMembers map[string]struct{}) (notes map[
 			color.Red("   ++++ doesn't match noteRegexp, ", n)
 			n = fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber())
 		}
-		notes[label] = append(notes[label], n)
-
 		user := pr.issue.GetUser().GetLogin()
 		if _, ok := grpcMembers[user]; !ok {
-			notes["Thank You"] = append(notes["Thank You"], "@"+user)
+			n += "\n   - Special thanks: " + "@" + user
 		}
+
+		notes[label] = append(notes[label], n)
 	}
 	return
 }
