@@ -258,9 +258,22 @@ func pickMostWeightedLabel(labels []github.Label) string {
 
 ///////////////////// generate notes ////////////////////////
 
-func generateNotes(prs []*mergedPR, grpcMembers map[string]struct{}) (notes map[string][]string) {
+type note struct {
+	head string
+	sub  []string
+}
+
+func (n *note) String() string {
+	ret := " * " + n.head
+	for _, s := range n.sub {
+		ret += "\n   - " + s
+	}
+	return ret
+}
+
+func generateNotes(prs []*mergedPR, grpcMembers map[string]struct{}) (notes map[string][]*note) {
 	fmt.Print("\n================ generating notes ================\n\n")
-	notes = make(map[string][]string) // label -> PR description.
+	notes = make(map[string][]*note)
 	for _, pr := range prs {
 		label := pickMostWeightedLabel(pr.issue.Labels)
 		_, ok := labelToSectionName[label]
@@ -270,17 +283,22 @@ func generateNotes(prs []*mergedPR, grpcMembers map[string]struct{}) (notes map[
 		fmt.Printf(" [%v] - ", color.BlueString("%v", pr.issue.GetNumber()))
 		fmt.Print(color.GreenString("%-18q", label))
 		fmt.Printf(" from: %v\n", labelsToString(pr.issue.Labels))
+
 		n := getFirstLine(pr.commit.GetMessage())
 		if ok := noteRegexp.MatchString(n); !ok {
 			color.Red("   ++++ doesn't match noteRegexp, ", n)
 			n = fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber())
 		}
-		user := pr.issue.GetUser().GetLogin()
-		if _, ok := grpcMembers[user]; !ok {
-			n += "\n   - Special thanks: " + "@" + user
+		noteLine := &note{
+			head: n,
 		}
 
-		notes[label] = append(notes[label], n)
+		user := pr.issue.GetUser().GetLogin()
+		if _, ok := grpcMembers[user]; !ok {
+			noteLine.sub = append(noteLine.sub, "Special thanks: "+"@"+user)
+		}
+
+		notes[label] = append(notes[label], noteLine)
 	}
 	return
 }
@@ -331,7 +349,7 @@ func main() {
 		fmt.Println()
 		fmt.Println("#", labelToSectionName[k])
 		for _, n := range notes[k] {
-			fmt.Println(" *", n)
+			fmt.Println(n)
 		}
 	}
 }
