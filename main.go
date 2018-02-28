@@ -24,6 +24,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -172,7 +173,7 @@ func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 	return
 }
 
-func getMergedPRsForMilestone(c *client, milestoneTitle string) (prs []*mergedPR) {
+func (c *client) getMergedPRsForMilestone(milestoneTitle string) (prs []*mergedPR) {
 	num, err := c.getMilestoneNumberForTitle(context.Background(), milestoneTitle)
 	if err != nil {
 		fmt.Println("failed to get milestone number: ", err)
@@ -185,13 +186,36 @@ func getMergedPRsForMilestone(c *client, milestoneTitle string) (prs []*mergedPR
 	return c.getMergedPRs(issues)
 }
 
+func (c *client) getOrgMembers(org string) map[string]struct{} {
+	opt := &github.ListMembersOptions{}
+	var count int
+	ret := make(map[string]struct{})
+	for {
+		members, resp, err := c.c.Organizations.ListMembers(context.Background(), org, opt)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, m := range members {
+			ret[m.GetLogin()] = struct{}{}
+		}
+		count += len(members)
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+	fmt.Printf("%v members in org %v\n", count, org)
+	return ret
+}
+
 ////////////////////////////////////////////////////
 
 ///////////////////// pick most weighted label ////////////////////////
 
 const (
-	labelPrefix  = "Type: "
-	defaultLabel = "Bug"
+	labelPrefix   = "Type: "
+	defaultLabel  = "Bug"
+	thankYouLabel = "Thank You"
 )
 
 var sortWeight = map[string]int{
@@ -204,6 +228,7 @@ var sortWeight = map[string]int{
 	"Documentation":    10,
 	"Testing":          0,
 	"Internal Cleanup": 0,
+	thankYouLabel:      -1, // Thank you label goes last.
 }
 
 func sortLabelName(labels []string) []string {
@@ -233,9 +258,9 @@ func pickMostWeightedLabel(labels []github.Label) string {
 
 ///////////////////// generate notes ////////////////////////
 
-func generateNotes(prs []*mergedPR) (notes map[string][]string) {
+func generateNotes(prs []*mergedPR, grpcMembers map[string]struct{}) (notes map[string][]string) {
 	fmt.Print("\n================ generating notes ================\n\n")
-	notes = make(map[string][]string)
+	notes = make(map[string][]string) // label -> PR description.
 	for _, pr := range prs {
 		label := pickMostWeightedLabel(pr.issue.Labels)
 		_, ok := labelToSectionName[label]
@@ -251,6 +276,11 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 			n = fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber())
 		}
 		notes[label] = append(notes[label], n)
+
+		user := pr.issue.GetUser().GetLogin()
+		if _, ok := grpcMembers[user]; !ok {
+			notes["Thank You"] = append(notes["Thank You"], "@"+user)
+		}
 	}
 	return
 }
@@ -266,6 +296,7 @@ var labelToSectionName = map[string]string{
 	"Performance":     "Performance Improvements",
 	"Bug":             "Bug Fixes",
 	"Documentation":   "Documentation",
+	"Thank You":       "Thank You",
 }
 
 func main() {
@@ -287,8 +318,8 @@ func main() {
 	}
 	c := &client{c: github.NewClient(tc)}
 
-	prs := getMergedPRsForMilestone(c, *release+milestoneTitleSurfix)
-	notes := generateNotes(prs)
+	prs := c.getMergedPRsForMilestone(*release + milestoneTitleSurfix)
+	notes := generateNotes(prs, c.getOrgMembers("grpc"))
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 
 	var keys []string
