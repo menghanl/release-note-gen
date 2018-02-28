@@ -42,6 +42,8 @@ var (
 	release    = flag.String("release", "", "release number")
 	owner      = flag.String("owner", "grpc", "github repo owner")
 	repo       = flag.String("repo", "grpc-go", "github repo")
+	thanks     = flag.Bool("thanks", false, "whether to include thank you note. grpc organization members are excluded")
+	urwelcome  = flag.String("urwelcome", "", "list of users to exclude from thank you note, format: user1,user2")
 )
 
 ///////////////////// string utils ////////////////////////
@@ -51,6 +53,8 @@ func issueToString(ii *github.Issue) string {
 	ret += color.CyanString("%v [%v] - %v", ii.GetNumber(), ii.GetState(), ii.GetTitle())
 	ret += "\n - "
 	ret += color.BlueString("%v", ii.GetHTMLURL())
+	ret += "\n - "
+	ret += color.BlueString("author: %v", *ii.GetUser().Login)
 	return ret
 }
 
@@ -170,8 +174,7 @@ func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 	return
 }
 
-func getMergedPRsForMilestone(httpClient *http.Client, milestoneTitle string) (prs []*mergedPR) {
-	c := &client{c: github.NewClient(httpClient)}
+func (c *client) getMergedPRsForMilestone(milestoneTitle string) (prs []*mergedPR) {
 	num, err := c.getMilestoneNumberForTitle(context.Background(), milestoneTitle)
 	if err != nil {
 		fmt.Println("failed to get milestone number: ", err)
@@ -182,6 +185,29 @@ func getMergedPRsForMilestone(httpClient *http.Client, milestoneTitle string) (p
 		return
 	}
 	return c.getMergedPRs(issues)
+}
+
+func (c *client) getOrgMembers(org string) map[string]struct{} {
+	opt := &github.ListMembersOptions{}
+	var count int
+	ret := make(map[string]struct{})
+	for {
+		members, resp, err := c.c.Organizations.ListMembers(context.Background(), org, opt)
+		if err != nil {
+			fmt.Println("failed to get org members: ", err)
+			return nil
+		}
+		for _, m := range members {
+			ret[m.GetLogin()] = struct{}{}
+		}
+		count += len(members)
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+	fmt.Printf("%v members in org %v\n", count, org)
+	return ret
 }
 
 ////////////////////////////////////////////////////
@@ -232,9 +258,24 @@ func pickMostWeightedLabel(labels []github.Label) string {
 
 ///////////////////// generate notes ////////////////////////
 
-func generateNotes(prs []*mergedPR) (notes map[string][]string) {
+type note struct {
+	head string
+	sub  []string
+}
+
+func (n *note) toMarkdown(includeSub bool) string {
+	ret := " * " + n.head
+	if includeSub {
+		for _, s := range n.sub {
+			ret += "\n   - " + s
+		}
+	}
+	return ret
+}
+
+func generateNotes(prs []*mergedPR, grpcMembers, urwelcomeMap map[string]struct{}) (notes map[string][]*note) {
 	fmt.Print("\n================ generating notes ================\n\n")
-	notes = make(map[string][]string)
+	notes = make(map[string][]*note)
 	for _, pr := range prs {
 		label := pickMostWeightedLabel(pr.issue.Labels)
 		_, ok := labelToSectionName[label]
@@ -244,12 +285,24 @@ func generateNotes(prs []*mergedPR) (notes map[string][]string) {
 		fmt.Printf(" [%v] - ", color.BlueString("%v", pr.issue.GetNumber()))
 		fmt.Print(color.GreenString("%-18q", label))
 		fmt.Printf(" from: %v\n", labelsToString(pr.issue.Labels))
+
 		n := getFirstLine(pr.commit.GetMessage())
 		if ok := noteRegexp.MatchString(n); !ok {
 			color.Red("   ++++ doesn't match noteRegexp, ", n)
 			n = fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber())
 		}
-		notes[label] = append(notes[label], n)
+		noteLine := &note{
+			head: n,
+		}
+
+		user := pr.issue.GetUser().GetLogin()
+		if _, ok := grpcMembers[user]; !ok {
+			if _, ok := urwelcomeMap[user]; !ok {
+				noteLine.sub = append(noteLine.sub, "Special thanks: "+"@"+user)
+			}
+		}
+
+		notes[label] = append(notes[label], noteLine)
 	}
 	return
 }
@@ -284,11 +337,25 @@ func main() {
 		)
 		tc = oauth2.NewClient(ctx, ts)
 	}
+	c := &client{c: github.NewClient(tc)}
 
-	prs := getMergedPRsForMilestone(tc, *release+milestoneTitleSurfix)
-	notes := generateNotes(prs)
+	prs := c.getMergedPRsForMilestone(*release + milestoneTitleSurfix)
+
+	var (
+		urwelcomeMap map[string]struct{}
+		grpcMembers  map[string]struct{}
+	)
+	if *thanks {
+		urwelcomeMap = make(map[string]struct{})
+		tmp := strings.Split(*urwelcome, ",")
+		for _, t := range tmp {
+			urwelcomeMap[t] = struct{}{}
+		}
+		grpcMembers = c.getOrgMembers("grpc")
+	}
+	notes := generateNotes(prs, grpcMembers, urwelcomeMap)
+
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
-
 	var keys []string
 	for k := range notes {
 		keys = append(keys, k)
@@ -298,7 +365,7 @@ func main() {
 		fmt.Println()
 		fmt.Println("#", labelToSectionName[k])
 		for _, n := range notes[k] {
-			fmt.Println(" *", n)
+			fmt.Println(n.toMarkdown(*thanks))
 		}
 	}
 }
