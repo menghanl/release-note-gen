@@ -341,14 +341,19 @@ func main() {
 
 	prs := c.getMergedPRsForMilestone(*release + milestoneTitleSurfix)
 
-	urwelcomeMap := make(map[string]struct{})
+	var (
+		urwelcomeMap map[string]struct{}
+		grpcMembers  map[string]struct{}
+	)
 	if *thanks {
+		urwelcomeMap = make(map[string]struct{})
 		tmp := strings.Split(*urwelcome, ",")
 		for _, t := range tmp {
 			urwelcomeMap[t] = struct{}{}
 		}
+		grpcMembers = c.getOrgMembers("grpc")
 	}
-	notes := generateNotes(prs, c.getOrgMembers("grpc"), urwelcomeMap)
+	notes := generateNotes(prs, grpcMembers, urwelcomeMap)
 
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 	var keys []string
