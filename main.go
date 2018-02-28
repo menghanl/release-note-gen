@@ -339,6 +339,8 @@ func main() {
 	}
 	c := &client{c: github.NewClient(tc)}
 
+	prs := c.getMergedPRsForMilestone(*release + milestoneTitleSurfix)
+
 	urwelcomeMap := make(map[string]struct{})
 	if *thanks {
 		tmp := strings.Split(*urwelcome, ",")
@@ -346,11 +348,9 @@ func main() {
 			urwelcomeMap[t] = struct{}{}
 		}
 	}
-
-	prs := c.getMergedPRsForMilestone(*release + milestoneTitleSurfix)
 	notes := generateNotes(prs, c.getOrgMembers("grpc"), urwelcomeMap)
-	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 
+	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 	var keys []string
 	for k := range notes {
 		keys = append(keys, k)
