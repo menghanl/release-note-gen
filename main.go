@@ -24,7 +24,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -195,7 +194,8 @@ func (c *client) getOrgMembers(org string) map[string]struct{} {
 	for {
 		members, resp, err := c.c.Organizations.ListMembers(context.Background(), org, opt)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println("failed to get org members: ", err)
+			return nil
 		}
 		for _, m := range members {
 			ret[m.GetLogin()] = struct{}{}
