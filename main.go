@@ -44,6 +44,7 @@ var (
 	repo       = flag.String("repo", "grpc-go", "github repo")
 	thanks     = flag.Bool("thanks", false, "whether to include thank you note. grpc organization members are excluded")
 	urwelcome  = flag.String("urwelcome", "", "list of users to exclude from thank you note, format: user1,user2")
+	verymuch   = flag.String("verymuch", "", "list of users to include in thank you note even if they are grpc org members, format: user1,user2")
 )
 
 ///////////////////// string utils ////////////////////////
@@ -273,7 +274,7 @@ func (n *note) toMarkdown(includeSub bool) string {
 	return ret
 }
 
-func generateNotes(prs []*mergedPR, grpcMembers, urwelcomeMap map[string]struct{}) (notes map[string][]*note) {
+func generateNotes(prs []*mergedPR, grpcMembers, urwelcomeMap, verymuchMap map[string]struct{}) (notes map[string][]*note) {
 	fmt.Print("\n================ generating notes ================\n\n")
 	notes = make(map[string][]*note)
 	for _, pr := range prs {
@@ -296,10 +297,13 @@ func generateNotes(prs []*mergedPR, grpcMembers, urwelcomeMap map[string]struct{
 		}
 
 		user := pr.issue.GetUser().GetLogin()
-		if _, ok := grpcMembers[user]; !ok {
-			if _, ok := urwelcomeMap[user]; !ok {
-				noteLine.sub = append(noteLine.sub, "Special thanks: "+"@"+user)
-			}
+
+		_, isGRPCMember := grpcMembers[user]
+		_, isWelcome := urwelcomeMap[user]
+		_, isVerymuch := verymuchMap[user]
+
+		if isVerymuch || (!isGRPCMember && !isWelcome) {
+			noteLine.sub = append(noteLine.sub, "Special thanks: "+"@"+user)
 		}
 
 		notes[label] = append(notes[label], noteLine)
@@ -318,6 +322,15 @@ var labelToSectionName = map[string]string{
 	"Performance":     "Performance Improvements",
 	"Bug":             "Bug Fixes",
 	"Documentation":   "Documentation",
+}
+
+func commaStringToSet(s string) map[string]struct{} {
+	ret := make(map[string]struct{})
+	tmp := strings.Split(s, ",")
+	for _, t := range tmp {
+		ret[t] = struct{}{}
+	}
+	return ret
 }
 
 func main() {
@@ -343,17 +356,15 @@ func main() {
 
 	var (
 		urwelcomeMap map[string]struct{}
+		verymuchMap  map[string]struct{}
 		grpcMembers  map[string]struct{}
 	)
 	if *thanks {
-		urwelcomeMap = make(map[string]struct{})
-		tmp := strings.Split(*urwelcome, ",")
-		for _, t := range tmp {
-			urwelcomeMap[t] = struct{}{}
-		}
+		urwelcomeMap = commaStringToSet(*urwelcome)
+		verymuchMap = commaStringToSet(*verymuch)
 		grpcMembers = c.getOrgMembers("grpc")
 	}
-	notes := generateNotes(prs, grpcMembers, urwelcomeMap)
+	notes := generateNotes(prs, grpcMembers, urwelcomeMap, verymuchMap)
 
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
 	var keys []string
