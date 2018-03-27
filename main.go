@@ -324,6 +324,15 @@ var labelToSectionName = map[string]string{
 	"Documentation":   "Documentation",
 }
 
+func commaStringToSet(s string) map[string]struct{} {
+	ret := make(map[string]struct{})
+	tmp := strings.Split(s, ",")
+	for _, t := range tmp {
+		ret[t] = struct{}{}
+	}
+	return ret
+}
+
 func main() {
 	flag.Parse()
 
@@ -351,16 +360,8 @@ func main() {
 		grpcMembers  map[string]struct{}
 	)
 	if *thanks {
-		urwelcomeMap = make(map[string]struct{})
-		tmp := strings.Split(*urwelcome, ",")
-		for _, t := range tmp {
-			urwelcomeMap[t] = struct{}{}
-		}
-		verymuchMap = make(map[string]struct{})
-		tmp = strings.Split(*verymuch, ",")
-		for _, t := range tmp {
-			verymuchMap[t] = struct{}{}
-		}
+		urwelcomeMap = commaStringToSet(*urwelcome)
+		verymuchMap = commaStringToSet(*verymuch)
 		grpcMembers = c.getOrgMembers("grpc")
 	}
 	notes := generateNotes(prs, grpcMembers, urwelcomeMap, verymuchMap)
