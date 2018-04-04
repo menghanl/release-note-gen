@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,14 +36,13 @@ import (
 )
 
 var (
-	noteRegexp = regexp.MustCompile(`^.*\(#[0-9]+\)$`)
-	token      = flag.String("token", "", "github token")
-	release    = flag.String("release", "", "release number")
-	owner      = flag.String("owner", "grpc", "github repo owner")
-	repo       = flag.String("repo", "grpc-go", "github repo")
-	thanks     = flag.Bool("thanks", false, "whether to include thank you note. grpc organization members are excluded")
-	urwelcome  = flag.String("urwelcome", "", "list of users to exclude from thank you note, format: user1,user2")
-	verymuch   = flag.String("verymuch", "", "list of users to include in thank you note even if they are grpc org members, format: user1,user2")
+	token     = flag.String("token", "", "github token")
+	release   = flag.String("release", "", "release number")
+	owner     = flag.String("owner", "grpc", "github repo owner")
+	repo      = flag.String("repo", "grpc-go", "github repo")
+	thanks    = flag.Bool("thanks", false, "whether to include thank you note. grpc organization members are excluded")
+	urwelcome = flag.String("urwelcome", "", "list of users to exclude from thank you note, format: user1,user2")
+	verymuch  = flag.String("verymuch", "", "list of users to include in thank you note even if they are grpc org members, format: user1,user2")
 )
 
 ///////////////////// string utils ////////////////////////
@@ -287,13 +285,8 @@ func generateNotes(prs []*mergedPR, grpcMembers, urwelcomeMap, verymuchMap map[s
 		fmt.Print(color.GreenString("%-18q", label))
 		fmt.Printf(" from: %v\n", labelsToString(pr.issue.Labels))
 
-		n := getFirstLine(pr.commit.GetMessage())
-		if ok := noteRegexp.MatchString(n); !ok {
-			color.Red("   ++++ doesn't match noteRegexp, ", n)
-			n = fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber())
-		}
 		noteLine := &note{
-			head: n,
+			head: fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber()),
 		}
 
 		user := pr.issue.GetUser().GetLogin()
