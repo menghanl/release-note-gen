@@ -69,11 +69,6 @@ func issueEventToString(ie *github.IssueEvent) string {
 	return fmt.Sprintf("[%v]", ie.GetEvent())
 }
 
-func getFirstLine(s string) string {
-	ss := strings.Split(s, "\n")
-	return ss[0]
-}
-
 ////////////////////////////////////////////////////
 
 ///////////////////// get PR for label ////////////////////////
@@ -131,23 +126,7 @@ func (c *client) getMergeEventForPR(ctx context.Context, issue *github.Issue) (*
 	return nil, fmt.Errorf("merge event not found")
 }
 
-func (c *client) getCommitFromMerge(ctx context.Context, ie *github.IssueEvent) (*github.Commit, error) {
-	if ie.GetEvent() != "merged" {
-		return nil, fmt.Errorf("not merge issue event")
-	}
-	cmt, _, err := c.c.Repositories.GetCommit(ctx, *owner, *repo, ie.GetCommitID())
-	if err != nil {
-		return nil, err
-	}
-	return cmt.Commit, err
-}
-
-type mergedPR struct {
-	issue  *github.Issue
-	commit *github.Commit
-}
-
-func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
+func (c *client) getMergedPRs(issues []*github.Issue) (prs []*github.Issue) {
 	ctx := context.Background()
 	for _, ii := range issues {
 		fmt.Println(issueToString(ii))
@@ -163,17 +142,12 @@ func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 			continue
 		}
 		fmt.Println(" -", issueEventToString(ie))
-		c, err := c.getCommitFromMerge(ctx, ie)
-		if err != nil {
-			fmt.Println("failed to get commit message: ", err)
-			continue
-		}
-		prs = append(prs, &mergedPR{issue: ii, commit: c})
+		prs = append(prs, ii)
 	}
 	return
 }
 
-func (c *client) getMergedPRsForMilestone(milestoneTitle string) (prs []*mergedPR) {
+func (c *client) getMergedPRsForMilestone(milestoneTitle string) (prs []*github.Issue) {
 	num, err := c.getMilestoneNumberForTitle(context.Background(), milestoneTitle)
 	if err != nil {
 		fmt.Println("failed to get milestone number: ", err)
@@ -272,24 +246,24 @@ func (n *note) toMarkdown(includeSub bool) string {
 	return ret
 }
 
-func generateNotes(prs []*mergedPR, grpcMembers, urwelcomeMap, verymuchMap map[string]struct{}) (notes map[string][]*note) {
+func generateNotes(prs []*github.Issue, grpcMembers, urwelcomeMap, verymuchMap map[string]struct{}) (notes map[string][]*note) {
 	fmt.Print("\n================ generating notes ================\n\n")
 	notes = make(map[string][]*note)
 	for _, pr := range prs {
-		label := pickMostWeightedLabel(pr.issue.Labels)
+		label := pickMostWeightedLabel(pr.Labels)
 		_, ok := labelToSectionName[label]
 		if !ok {
 			continue // If ok==false, ignore this PR in the release note.
 		}
-		fmt.Printf(" [%v] - ", color.BlueString("%v", pr.issue.GetNumber()))
+		fmt.Printf(" [%v] - ", color.BlueString("%v", pr.GetNumber()))
 		fmt.Print(color.GreenString("%-18q", label))
-		fmt.Printf(" from: %v\n", labelsToString(pr.issue.Labels))
+		fmt.Printf(" from: %v\n", labelsToString(pr.Labels))
 
 		noteLine := &note{
-			head: fmt.Sprintf("%v (#%d)", pr.issue.GetTitle(), pr.issue.GetNumber()),
+			head: fmt.Sprintf("%v (#%d)", pr.GetTitle(), pr.GetNumber()),
 		}
 
-		user := pr.issue.GetUser().GetLogin()
+		user := pr.GetUser().GetLogin()
 
 		_, isGRPCMember := grpcMembers[user]
 		_, isWelcome := urwelcomeMap[user]
