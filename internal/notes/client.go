@@ -9,12 +9,15 @@ import (
 )
 
 type client struct {
+	owner string
+	repo  string
+
 	c *github.Client
 }
 
 func (c *client) getMilestoneNumberForTitle(ctx context.Context, milestoneTitle string) (int, error) {
 	fmt.Println("milestone title: ", milestoneTitle)
-	milestones, _, err := c.c.Issues.ListMilestones(context.Background(), *owner, *repo,
+	milestones, _, err := c.c.Issues.ListMilestones(context.Background(), c.owner, c.repo,
 		&github.MilestoneListOptions{
 			State:       "all",
 			ListOptions: github.ListOptions{PerPage: 100},
@@ -34,7 +37,7 @@ func (c *client) getMilestoneNumberForTitle(ctx context.Context, milestoneTitle 
 
 func (c *client) getClosedIssuesWithMilestoneNumber(ctx context.Context, milestoneNumber string) ([]*github.Issue, error) {
 	fmt.Println("milestone number: ", milestoneNumber)
-	issues, _, err := c.c.Issues.ListByRepo(ctx, *owner, *repo,
+	issues, _, err := c.c.Issues.ListByRepo(ctx, c.owner, c.repo,
 		&github.IssueListByRepoOptions{
 			State:       "closed",
 			Milestone:   milestoneNumber,
@@ -49,7 +52,7 @@ func (c *client) getClosedIssuesWithMilestoneNumber(ctx context.Context, milesto
 }
 
 func (c *client) getMergeEventForPR(ctx context.Context, issue *github.Issue) (*github.IssueEvent, error) {
-	events, _, err := c.c.Issues.ListIssueEvents(ctx, *owner, *repo, issue.GetNumber(), nil)
+	events, _, err := c.c.Issues.ListIssueEvents(ctx, c.owner, c.repo, issue.GetNumber(), nil)
 	if err != nil {
 		return nil, err
 	}

@@ -1,3 +1,4 @@
+// Package notes pulls PR from github and generate release notes.
 package notes
 
 import (
