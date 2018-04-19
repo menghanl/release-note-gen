@@ -31,7 +31,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/go-github/github"
-	"github.com/menghanl/release-note-gen/internal/notes"
+	"github.com/menghanl/release-note-gen/internal/ghclient"
 	"golang.org/x/oauth2"
 )
 
@@ -187,7 +187,7 @@ func main() {
 		)
 		tc = oauth2.NewClient(ctx, ts)
 	}
-	prs := notes.GetMergedPRsForMilestone(tc, *owner, *repo, *release+milestoneTitleSurfix)
+	prs := ghclient.GetMergedPRsForMilestone(tc, *owner, *repo, *release+milestoneTitleSurfix)
 
 	var (
 		urwelcomeMap map[string]struct{}

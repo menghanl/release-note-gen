@@ -1,5 +1,5 @@
-// Package notes pulls PR from github and generate release notes.
-package notes
+// Package ghclient does something.
+package ghclient
 
 import (
 	"net/http"
