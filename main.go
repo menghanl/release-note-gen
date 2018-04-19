@@ -187,7 +187,8 @@ func main() {
 		)
 		tc = oauth2.NewClient(ctx, ts)
 	}
-	prs := ghclient.GetMergedPRsForMilestone(tc, *owner, *repo, *release+milestoneTitleSurfix)
+	c := ghclient.New(tc, *owner, *repo)
+	prs := c.GetMergedPRsForMilestone(*release + milestoneTitleSurfix)
 
 	var (
 		urwelcomeMap map[string]struct{}
@@ -197,7 +198,7 @@ func main() {
 	if *thanks {
 		urwelcomeMap = commaStringToSet(*urwelcome)
 		verymuchMap = commaStringToSet(*verymuch)
-		// grpcMembers = c.getOrgMembers("grpc")
+		grpcMembers = c.GetOrgMembers("grpc")
 	}
 	notes := generateNotes(prs, grpcMembers, urwelcomeMap, verymuchMap)
 

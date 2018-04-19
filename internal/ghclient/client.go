@@ -14,12 +14,21 @@ type Client struct {
 	c *github.Client
 }
 
-// GetMergedPRsForMilestone returns a list of github issues that are merged PRs for this milestone.
-func GetMergedPRsForMilestone(tc *http.Client, owner, repo, milestone string) []*github.Issue {
-	c := &Client{
+// New creates a new client.
+func New(tc *http.Client, owner, repo string) *Client {
+	return &Client{
 		owner: owner,
 		repo:  repo,
 		c:     github.NewClient(tc),
 	}
+}
+
+// GetMergedPRsForMilestone returns a list of github issues that are merged PRs for this milestone.
+func (c *Client) GetMergedPRsForMilestone(milestone string) []*github.Issue {
 	return c.getMergedPRsForMilestone(milestone)
+}
+
+// GetOrgMembers returns a set of names of members in the org.
+func (c *Client) GetOrgMembers(org string) map[string]struct{} {
+	return c.getOrgMembers(org)
 }
