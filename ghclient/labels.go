@@ -1,11 +1,11 @@
 package ghclient
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/google/go-github/github"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -34,7 +34,7 @@ func sortLabelName(labels []string) []string {
 
 func pickMostWeightedLabel(labels []github.Label) string {
 	if len(labels) <= 0 {
-		fmt.Println("0 lable was assigned to issue")
+		log.Info("0 lable was assigned to issue")
 		return defaultLabel
 	}
 	var names []string
