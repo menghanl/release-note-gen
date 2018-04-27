@@ -31,7 +31,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/go-github/github"
-	"github.com/menghanl/release-note-gen/internal/ghclient"
+	"github.com/menghanl/release-note-gen/ghclient"
 	"golang.org/x/oauth2"
 )
 

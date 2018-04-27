@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/menghanl/release-note-gen/internal/ghclient"
+	"github.com/menghanl/release-note-gen/ghclient"
 	"golang.org/x/oauth2"
 )
 
