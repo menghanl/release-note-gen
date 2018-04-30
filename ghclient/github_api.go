@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/google/go-github/github"
 	log "github.com/sirupsen/logrus"
@@ -60,20 +61,35 @@ func (c *Client) getMergeEventForPR(ctx context.Context, issue *github.Issue) (*
 
 func (c *Client) getMergedPRs(issues []*github.Issue) (prs []*github.Issue) {
 	ctx := context.Background()
+
+	prChan := make(chan *github.Issue)
+
+	var wg sync.WaitGroup
 	for _, ii := range issues {
-		log.Info(issueToString(ii))
-		log.Info(" -", labelsToString(ii.Labels))
 		if ii.PullRequestLinks == nil {
-			log.Info("not a pull request")
+			log.Infof("%v not a pull request", issueToString(ii))
 			continue
 		}
-		// ii is a PR.
-		ie, err := c.getMergeEventForPR(ctx, ii)
-		if err != nil {
-			log.Info("failed to get merge event: ", err)
-			continue
-		}
-		log.Info(" -", issueEventToString(ie))
+		wg.Add(1)
+		go func(ii *github.Issue) {
+			defer wg.Done()
+			// ii is a PR.
+			_, err := c.getMergeEventForPR(ctx, ii)
+			if err != nil {
+				log.Info("failed to get merge event: ", err)
+				return
+			}
+			prChan <- ii
+		}(ii)
+	}
+	go func() {
+		wg.Wait()
+		close(prChan)
+	}()
+
+	for ii := range prChan {
+		log.Info(issueToString(ii))
+		log.Info(" - ", labelsToString(ii.Labels))
 		prs = append(prs, ii)
 	}
 	return
