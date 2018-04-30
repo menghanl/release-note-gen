@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,13 +10,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
+var token = flag.String("token", "", "github token")
+
 func main() {
 	var tc *http.Client
-	token := "dcfe7dcf8afea7d469450bd4ad2152d32a3128c1"
-	if token != "" {
+	if *token != "" {
 		ctx := context.Background()
 		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: token},
+			&oauth2.Token{AccessToken: *token},
 		)
 		tc = oauth2.NewClient(ctx, ts)
 	}
