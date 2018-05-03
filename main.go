@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/google/go-github/github"
@@ -149,26 +150,41 @@ type mergedPR struct {
 
 func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 	ctx := context.Background()
+	mergedPRChan := make(chan *mergedPR)
+
+	var wg sync.WaitGroup
 	for _, ii := range issues {
-		fmt.Println(issueToString(ii))
-		fmt.Println(" -", labelsToString(ii.Labels))
 		if ii.PullRequestLinks == nil {
-			fmt.Println("not a pull request")
+			fmt.Println("not a pull request", issueToString(ii))
 			continue
 		}
-		// ii is a PR.
-		ie, err := c.getMergeEventForPR(ctx, ii)
-		if err != nil {
-			fmt.Println("failed to get merge event: ", err)
-			continue
-		}
-		fmt.Println(" -", issueEventToString(ie))
-		c, err := c.getCommitFromMerge(ctx, ie)
-		if err != nil {
-			fmt.Println("failed to get commit message: ", err)
-			continue
-		}
-		prs = append(prs, &mergedPR{issue: ii, commit: c})
+		wg.Add(1)
+		go func(ii *github.Issue) {
+			defer wg.Done()
+			// ii is a PR.
+			ie, err := c.getMergeEventForPR(ctx, ii)
+			if err != nil {
+				fmt.Println("failed to get merge event: ", err)
+				return
+			}
+			fmt.Println(" -", issueEventToString(ie))
+			c, err := c.getCommitFromMerge(ctx, ie)
+			if err != nil {
+				fmt.Println("failed to get commit message: ", err)
+				return
+			}
+			mergedPRChan <- &mergedPR{issue: ii, commit: c}
+		}(ii)
+	}
+	go func() {
+		wg.Wait()
+		close(mergedPRChan)
+	}()
+
+	for mpr := range mergedPRChan {
+		fmt.Println(issueToString(mpr.issue))
+		fmt.Println(" -", labelsToString(mpr.issue.Labels))
+		prs = append(prs, mpr)
 	}
 	return
 }
