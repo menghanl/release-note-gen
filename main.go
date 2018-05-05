@@ -179,6 +179,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// API calls begin.
+
 	var tc *http.Client
 	if *token != "" {
 		ctx := context.Background()
@@ -187,6 +189,7 @@ func main() {
 		)
 		tc = oauth2.NewClient(ctx, ts)
 	}
+
 	c := ghclient.New(tc, *owner, *repo)
 	prs := c.GetMergedPRsForMilestone(*release + milestoneTitleSurfix)
 
@@ -208,6 +211,11 @@ func main() {
 		keys = append(keys, k)
 	}
 	sortLabelName(keys)
+
+	// API calls end.
+
+	// Data should be same between terminal and webpage until now.
+
 	for _, k := range keys {
 		fmt.Println()
 		fmt.Println("#", labelToSectionName[k])
