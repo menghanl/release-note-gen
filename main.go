@@ -203,6 +203,9 @@ func main() {
 		verymuchMap = commaStringToSet(*verymuch)
 		grpcMembers = c.GetOrgMembers("grpc")
 	}
+
+	// generate notes
+
 	notes := generateNotes(prs, grpcMembers, urwelcomeMap, verymuchMap)
 
 	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
