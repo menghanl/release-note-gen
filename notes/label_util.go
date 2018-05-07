@@ -1,4 +1,4 @@
-package ghclient
+package notes
 
 import (
 	"sort"
@@ -46,4 +46,14 @@ func pickMostWeightedLabel(labels []github.Label) string {
 		return defaultLabel
 	}
 	return names[0]
+}
+
+var labelToSectionName = map[string]string{
+	"Dependencies":    "Dependencies",
+	"API Change":      "API Changes",
+	"Behavior Change": "Behavior Changes",
+	"Feature":         "New Features",
+	"Performance":     "Performance Improvements",
+	"Bug":             "Bug Fixes",
+	"Documentation":   "Documentation",
 }

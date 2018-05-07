@@ -24,7 +24,3 @@ func labelsToString(ls []github.Label) string {
 	}
 	return fmt.Sprintf("%v", names)
 }
-
-func issueEventToString(ie *github.IssueEvent) string {
-	return fmt.Sprintf("[%v]", ie.GetEvent())
-}

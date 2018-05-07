@@ -4,18 +4,25 @@ package notes
 
 // Notes contains all the note entries for a given release.
 type Notes struct {
-	Org     string
-	Repo    string
-	Version string
-	Entries map[string][]Entry
+	Org      string
+	Repo     string
+	Version  string
+	Sections []*Section
+}
+
+// Section contains one release note section, for example "Feature".
+type Section struct {
+	Name    string
+	Entries []*Entry
+
+	// LabelName string
 }
 
 // Entry contains the info for one entry in the release notes.
 type Entry struct {
-	ID      int64
-	Number  int
-	Title   string
-	HTMLURL string
+	IssueNumber int
+	Title       string
+	HTMLURL     string
 
 	User      *User
 	MileStone *MileStone
