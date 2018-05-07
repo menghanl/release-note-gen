@@ -120,7 +120,7 @@ func (c *client) getClosedIssuesWithMilestoneNumber(ctx context.Context, milesto
 }
 
 func (c *client) getMergeEventForPR(ctx context.Context, issue *github.Issue) (*github.IssueEvent, error) {
-	events, _, err := c.c.Issues.ListIssueEvents(ctx, *owner, *repo, issue.GetNumber(), nil)
+	events, _, err := c.c.Issues.ListIssueEvents(ctx, *owner, *repo, issue.GetNumber(), &github.ListOptions{PerPage: 100})
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,6 @@ func (c *client) getMergedPRs(issues []*github.Issue) (prs []*mergedPR) {
 				fmt.Println("failed to get merge event: ", err)
 				return
 			}
-			fmt.Println(" -", issueEventToString(ie))
 			c, err := c.getCommitFromMerge(ctx, ie)
 			if err != nil {
 				fmt.Println("failed to get commit message: ", err)
