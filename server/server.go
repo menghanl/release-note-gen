@@ -27,7 +27,7 @@ func main() {
 	c := ghclient.New(tc, "grpc", "grpc-go")
 	prs := c.GetMergedPRsForMilestone("1.12 Release")
 
-	ns := notes.GenerateNotes(prs, notes.Filters{
+	ns := notes.GenerateNotes("grpc", "grpc-go", "1.12", prs, notes.Filters{
 		SpecialThanks: func(pr *github.Issue) bool {
 			return false
 		},

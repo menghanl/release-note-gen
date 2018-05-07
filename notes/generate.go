@@ -17,11 +17,11 @@ type Filters struct {
 }
 
 // GenerateNotes generate the release notes from the given prs and maps.
-func GenerateNotes(prs []*github.Issue, filters Filters) *Notes {
+func GenerateNotes(org, repo, version string, prs []*github.Issue, filters Filters) *Notes {
 	notes := Notes{
-		Org:     "todo",
-		Repo:    "todo",
-		Version: "todo",
+		Org:     org,
+		Repo:    repo,
+		Version: version,
 	}
 
 	sectionsMap := make(map[string]*Section)

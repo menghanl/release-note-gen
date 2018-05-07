@@ -98,7 +98,7 @@ func main() {
 
 	// generate notes
 
-	ns := notes.GenerateNotes(prs, notes.Filters{
+	ns := notes.GenerateNotes(*owner, *repo, *release, prs, notes.Filters{
 		SpecialThanks: thanksFilter,
 	})
 
