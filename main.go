@@ -26,12 +26,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
-	"strings"
 
-	"github.com/fatih/color"
-	"github.com/google/go-github/github"
 	"github.com/menghanl/release-note-gen/ghclient"
+	"github.com/menghanl/release-note-gen/notes"
 	"golang.org/x/oauth2"
 )
 
@@ -45,130 +42,7 @@ var (
 	verymuch  = flag.String("verymuch", "", "list of users to include in thank you note even if they are grpc org members, format: user1,user2")
 )
 
-func labelsToString(ls []github.Label) string {
-	var names []string
-	for _, l := range ls {
-		names = append(names, l.GetName())
-	}
-	return fmt.Sprintf("%v", names)
-}
-
-////////////////////////////////////////////////////
-
-///////////////////// pick most weighted label ////////////////////////
-
-const (
-	labelPrefix  = "Type: "
-	defaultLabel = "Bug"
-)
-
-var sortWeight = map[string]int{
-	"Dependencies":     70,
-	"API Change":       60,
-	"Behavior Change":  50,
-	"Feature":          40,
-	"Performance":      30,
-	"Bug":              20,
-	"Documentation":    10,
-	"Testing":          0,
-	"Internal Cleanup": 0,
-}
-
-func sortLabelName(labels []string) []string {
-	sort.Slice(labels, func(i, j int) bool {
-		return sortWeight[labels[i]] >= sortWeight[labels[j]]
-	})
-	return labels
-}
-
-func pickMostWeightedLabel(labels []github.Label) string {
-	if len(labels) <= 0 {
-		fmt.Println("0 lable was assigned to issue")
-		return defaultLabel
-	}
-	var names []string
-	for _, l := range labels {
-		names = append(names, strings.TrimPrefix(l.GetName(), labelPrefix))
-	}
-	sortLabelName(names)
-	if _, ok := sortWeight[names[0]]; !ok {
-		return defaultLabel
-	}
-	return names[0]
-}
-
-////////////////////////////////////////////////////
-
-///////////////////// generate notes ////////////////////////
-
-type note struct {
-	head string
-	sub  []string
-}
-
-func (n *note) toMarkdown(includeSub bool) string {
-	ret := " * " + n.head
-	if includeSub {
-		for _, s := range n.sub {
-			ret += "\n   - " + s
-		}
-	}
-	return ret
-}
-
-func generateNotes(prs []*github.Issue, grpcMembers, urwelcomeMap, verymuchMap map[string]struct{}) (notes map[string][]*note) {
-	fmt.Print("\n================ generating notes ================\n\n")
-	notes = make(map[string][]*note)
-	for _, pr := range prs {
-		label := pickMostWeightedLabel(pr.Labels)
-		_, ok := labelToSectionName[label]
-		if !ok {
-			continue // If ok==false, ignore this PR in the release note.
-		}
-		fmt.Printf(" [%v] - ", color.BlueString("%v", pr.GetNumber()))
-		fmt.Print(color.GreenString("%-18q", label))
-		fmt.Printf(" from: %v\n", labelsToString(pr.Labels))
-
-		noteLine := &note{
-			head: fmt.Sprintf("%v (#%d)", pr.GetTitle(), pr.GetNumber()),
-		}
-
-		user := pr.GetUser().GetLogin()
-
-		_, isGRPCMember := grpcMembers[user]
-		_, isWelcome := urwelcomeMap[user]
-		_, isVerymuch := verymuchMap[user]
-
-		if isVerymuch || (!isGRPCMember && !isWelcome) {
-			noteLine.sub = append(noteLine.sub, "Special thanks: "+"@"+user)
-		}
-
-		notes[label] = append(notes[label], noteLine)
-	}
-	return
-}
-
-////////////////////////////////////////////////////
-
 const milestoneTitleSurfix = " Release" // For example, "1.7 Release".
-var labelToSectionName = map[string]string{
-	"Dependencies":    "Dependencies",
-	"API Change":      "API Changes",
-	"Behavior Change": "Behavior Changes",
-	"Feature":         "New Features",
-	"Performance":     "Performance Improvements",
-	"Bug":             "Bug Fixes",
-	"Documentation":   "Documentation",
-}
-
-func commaStringToSet(s string) map[string]struct{} {
-	ret := make(map[string]struct{})
-	tmp := strings.Split(s, ",")
-	for _, t := range tmp {
-		ret[t] = struct{}{}
-	}
-	return ret
-}
 
 func main() {
 	flag.Parse()
@@ -179,7 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// API calls begin.
+	// Github API calls begin.
 
 	var tc *http.Client
 	if *token != "" {
@@ -193,37 +67,26 @@ func main() {
 	c := ghclient.New(tc, *owner, *repo)
 	prs := c.GetMergedPRsForMilestone(*release + milestoneTitleSurfix)
 
-	var (
-		urwelcomeMap map[string]struct{}
-		verymuchMap  map[string]struct{}
-		grpcMembers  map[string]struct{}
-	)
-	if *thanks {
-		urwelcomeMap = commaStringToSet(*urwelcome)
-		verymuchMap = commaStringToSet(*verymuch)
-		grpcMembers = c.GetOrgMembers("grpc")
-	}
-
 	// generate notes
 
-	notes := generateNotes(prs, grpcMembers, urwelcomeMap, verymuchMap)
+	ns := notes.GenerateNotes(prs, notes.Filters{})
+	// spew.Dump(ns)
 
-	fmt.Printf("\n================ generated notes for release %v ================\n\n", *release)
-	var keys []string
-	for k := range notes {
-		keys = append(keys, k)
-	}
-	sortLabelName(keys)
+	fmt.Printf("\n================ generated notes for org %q repo %q release %q ================\n\n", ns.Org, ns.Repo, ns.Version)
 
-	// API calls end.
-
-	// Data should be same between terminal and webpage until now.
-
-	for _, k := range keys {
-		fmt.Println()
-		fmt.Println("#", labelToSectionName[k])
-		for _, n := range notes[k] {
-			fmt.Println(n.toMarkdown(*thanks))
+	for _, section := range ns.Sections {
+		fmt.Printf("# %v\n\n", section.Name)
+		for _, entry := range section.Entries {
+			fmt.Printf(" * %v (#%v)\n", entry.Title, entry.IssueNumber)
 		}
+		fmt.Println()
 	}
+
+	// for _, k := range keys {
+	// 	fmt.Println()
+	// 	fmt.Println("#", labelToSectionName[k])
+	// 	for _, n := range notes[k] {
+	// 		fmt.Println(n.toMarkdown(*thanks))
+	// 	}
+	// }
 }

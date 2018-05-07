@@ -24,7 +24,7 @@ func GenerateNotes(prs []*github.Issue, filters Filters) *Notes {
 		Version: "todo",
 	}
 
-	sections := make(map[string]*Section)
+	sectionsMap := make(map[string]*Section)
 
 	for _, pr := range prs {
 		label := pickMostWeightedLabel(pr.Labels)
@@ -36,10 +36,12 @@ func GenerateNotes(prs []*github.Issue, filters Filters) *Notes {
 		fmt.Print(color.GreenString("%-18q", label))
 		fmt.Printf(" from: %v\n", labelsToString(pr.Labels))
 
-		section, ok := sections[label]
+		section, ok := sectionsMap[label]
 		if !ok {
-			section = &Section{Name: label}
-			sections[label] = section
+			section = &Section{Name: labelToSectionName[label], LabelName: label}
+			sectionsMap[label] = section
+
+			notes.Sections = append(notes.Sections, section)
 		}
 
 		user := pr.GetUser()
@@ -63,6 +65,6 @@ func GenerateNotes(prs []*github.Issue, filters Filters) *Notes {
 		}
 		section.Entries = append(section.Entries, entry)
 	}
-
+	notes.Sections = sortSections(notes.Sections)
 	return &notes
 }

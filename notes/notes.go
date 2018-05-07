@@ -12,10 +12,9 @@ type Notes struct {
 
 // Section contains one release note section, for example "Feature".
 type Section struct {
-	Name    string
-	Entries []*Entry
-
-	// LabelName string
+	Name      string
+	LabelName string
+	Entries   []*Entry
 }
 
 // Entry contains the info for one entry in the release notes.

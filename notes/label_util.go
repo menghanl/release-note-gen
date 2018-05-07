@@ -57,3 +57,10 @@ var labelToSectionName = map[string]string{
 	"Bug":             "Bug Fixes",
 	"Documentation":   "Documentation",
 }
+
+func sortSections(sections []*Section) []*Section {
+	sort.Slice(sections, func(i, j int) bool {
+		return sortWeight[sections[i].LabelName] >= sortWeight[sections[j].LabelName]
+	})
+	return sections
+}
