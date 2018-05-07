@@ -27,6 +27,10 @@ func GenerateNotes(prs []*github.Issue, filters Filters) *Notes {
 	sectionsMap := make(map[string]*Section)
 
 	for _, pr := range prs {
+		if filters.Ignore != nil && filters.Ignore(pr) {
+			continue
+		}
+
 		label := pickMostWeightedLabel(pr.Labels)
 		_, ok := labelToSectionName[label]
 		if !ok {
@@ -61,7 +65,7 @@ func GenerateNotes(prs []*github.Issue, filters Filters) *Notes {
 			// MileStone: &MileStone{
 			// }
 
-			SpecialThanks: false,
+			SpecialThanks: filters.SpecialThanks != nil && filters.SpecialThanks(pr),
 		}
 		section.Entries = append(section.Entries, entry)
 	}

@@ -26,7 +26,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
+	"github.com/google/go-github/github"
 	"github.com/menghanl/release-note-gen/ghclient"
 	"github.com/menghanl/release-note-gen/notes"
 	"golang.org/x/oauth2"
@@ -43,6 +45,15 @@ var (
 )
 
 const milestoneTitleSurfix = " Release" // For example, "1.7 Release".
+
+func commaStringToSet(s string) map[string]struct{} {
+	ret := make(map[string]struct{})
+	tmp := strings.Split(s, ",")
+	for _, t := range tmp {
+		ret[t] = struct{}{}
+	}
+	return ret
+}
 
 func main() {
 	flag.Parse()
@@ -67,26 +78,39 @@ func main() {
 	c := ghclient.New(tc, *owner, *repo)
 	prs := c.GetMergedPRsForMilestone(*release + milestoneTitleSurfix)
 
+	var (
+		thanksFilter func(pr *github.Issue) bool
+	)
+	if *thanks {
+		urwelcomeMap := commaStringToSet(*urwelcome)
+		verymuchMap := commaStringToSet(*verymuch)
+		grpcMembers := c.GetOrgMembers("grpc")
+
+		thanksFilter = func(pr *github.Issue) bool {
+			user := pr.GetUser().GetLogin()
+			_, isGRPCMember := grpcMembers[user]
+			_, isWelcome := urwelcomeMap[user]
+			_, isVerymuch := verymuchMap[user]
+
+			return *thanks && (isVerymuch || (!isGRPCMember && !isWelcome))
+		}
+	}
+
 	// generate notes
 
-	ns := notes.GenerateNotes(prs, notes.Filters{})
-	// spew.Dump(ns)
+	ns := notes.GenerateNotes(prs, notes.Filters{
+		SpecialThanks: thanksFilter,
+	})
 
 	fmt.Printf("\n================ generated notes for org %q repo %q release %q ================\n\n", ns.Org, ns.Repo, ns.Version)
-
 	for _, section := range ns.Sections {
 		fmt.Printf("# %v\n\n", section.Name)
 		for _, entry := range section.Entries {
 			fmt.Printf(" * %v (#%v)\n", entry.Title, entry.IssueNumber)
+			if entry.SpecialThanks {
+				fmt.Printf("   - Special Thanks: @%v\n", entry.User.Login)
+			}
 		}
 		fmt.Println()
 	}
-
-	// for _, k := range keys {
-	// 	fmt.Println()
-	// 	fmt.Println("#", labelToSectionName[k])
-	// 	for _, n := range notes[k] {
-	// 		fmt.Println(n.toMarkdown(*thanks))
-	// 	}
-	// }
 }
