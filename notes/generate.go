@@ -49,6 +49,7 @@ func GenerateNotes(org, repo, version string, prs []*github.Issue, filters Filte
 		}
 
 		user := pr.GetUser()
+		milestone := pr.GetMilestone()
 
 		entry := &Entry{
 			// head: fmt.Sprintf("%v (#%d)", pr.GetTitle(), pr.GetNumber()),
@@ -62,9 +63,10 @@ func GenerateNotes(org, repo, version string, prs []*github.Issue, filters Filte
 				Login:     user.GetLogin(),
 			},
 
-			// MileStone: &MileStone{
-			// }
-
+			MileStone: &MileStone{
+				ID:    milestone.GetID(),
+				Title: milestone.GetTitle(),
+			},
 			SpecialThanks: filters.SpecialThanks != nil && filters.SpecialThanks(pr),
 		}
 		section.Entries = append(section.Entries, entry)
